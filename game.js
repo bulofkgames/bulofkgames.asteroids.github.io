@@ -1019,7 +1019,8 @@ Game = {
 };
 
 
-$(function () {
+window.onload = function () {
+
   var canvas = $("#canvas");
   Game.canvasWidth  = canvas.width();
   Game.canvasHeight = canvas.height();
@@ -1028,6 +1029,7 @@ $(function () {
 
   Text.context = context;
   Text.face = vector_battle;
+
 
   var gridWidth = Math.round(Game.canvasWidth / GRID_SIZE);
   var gridHeight = Math.round(Game.canvasHeight / GRID_SIZE);
