@@ -1,4 +1,3 @@
-<script>
 /* =====================================
  ASTEROIDS HTML5 — ARCADE REMASTER
  Original concept: Atari / dmcinnes
@@ -104,4 +103,3 @@ function loop(){
 }
 
 loop();
-</script>
