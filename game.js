@@ -1,8 +1,10 @@
 /* =====================================
  ASTEROIDS HTML5 — ARCADE REMASTER
  Original concept: Atari / dmcinnes
- Modifications, Fixes & Improvements:
- Leonardo Dias Gomes — YouTube: @BULOFK
+
+ Modifications, Fixes & Gameplay Expansion:
+ Leonardo Dias Gomes
+ YouTube: @BULOFK
 ===================================== */
 
 const canvas = document.getElementById("canvas");
@@ -19,7 +21,6 @@ const Game = {
   state: "menu",
   score: 0,
   lives: 3,
-  level: 1,
   high: Number(localStorage.getItem("asteroidsHS")) || 0,
   asteroids: [],
   bullets: [],
@@ -45,37 +46,49 @@ function wrap(o){
   if(o.y>HEIGHT) o.y-=HEIGHT;
 }
 
+/* ========= DIFFICULTY SYSTEM ========= */
+function getDifficulty() {
+  return {
+    level: Math.floor(Game.score / 200) + 1,
+    speed: 1 + Math.floor(Game.score / 400) * 0.2,
+    maxAsteroids: 6 + Math.floor(Game.score / 150),
+    creditChance: Math.min(0.12 + Game.score / 5000, 0.35)
+  };
+}
+
 /* ========= SHIP ========= */
 function Ship(){
-  this.x=WIDTH/2;
-  this.y=HEIGHT/2;
-  this.rot=0;
-  this.vx=0;
-  this.vy=0;
-  this.cool=false;
-  this.inv=120; // invencibilidade inicial
+  this.x = WIDTH/2;
+  this.y = HEIGHT/2;
+  this.rot = 0;
+  this.vx = 0;
+  this.vy = 0;
+  this.cool = false;
+  this.inv = 120;
 }
-Ship.prototype.update=function(){
-  if(KEY.ArrowLeft) this.rot-=4;
-  if(KEY.ArrowRight) this.rot+=4;
+Ship.prototype.update = function(){
+  if(KEY.ArrowLeft) this.rot -= 4;
+  if(KEY.ArrowRight) this.rot += 4;
   if(KEY.ArrowUp){
-    this.vx+=Math.sin(this.rot*Math.PI/180)*0.25;
-    this.vy-=Math.cos(this.rot*Math.PI/180)*0.25;
+    this.vx += Math.sin(this.rot*Math.PI/180)*0.25;
+    this.vy -= Math.cos(this.rot*Math.PI/180)*0.25;
   }
   if(KEY.Space && !this.cool){
     Game.bullets.push(new Bullet(this));
-    this.cool=true;
+    this.cool = true;
   }
-  if(!KEY.Space) this.cool=false;
+  if(!KEY.Space) this.cool = false;
 
-  this.vx*=0.99; this.vy*=0.99;
-  this.x+=this.vx; this.y+=this.vy;
+  this.vx *= 0.99;
+  this.vy *= 0.99;
+  this.x += this.vx;
+  this.y += this.vy;
   wrap(this);
 
-  if(this.inv>0) this.inv--;
+  if(this.inv > 0) this.inv--;
 };
-Ship.prototype.draw=function(){
-  if(this.inv>0 && this.inv%20<10) return;
+Ship.prototype.draw = function(){
+  if(this.inv > 0 && this.inv % 20 < 10) return;
   ctx.save();
   ctx.translate(this.x,this.y);
   ctx.rotate(this.rot*Math.PI/180);
@@ -90,17 +103,19 @@ Ship.prototype.draw=function(){
 
 /* ========= BULLET ========= */
 function Bullet(s){
-  this.x=s.x; this.y=s.y;
-  this.vx=Math.sin(s.rot*Math.PI/180)*7;
-  this.vy=-Math.cos(s.rot*Math.PI/180)*7;
-  this.life=60;
+  this.x = s.x;
+  this.y = s.y;
+  this.vx = Math.sin(s.rot*Math.PI/180)*7;
+  this.vy = -Math.cos(s.rot*Math.PI/180)*7;
+  this.life = 60;
 }
-Bullet.prototype.update=function(){
-  this.x+=this.vx; this.y+=this.vy;
+Bullet.prototype.update = function(){
+  this.x += this.vx;
+  this.y += this.vy;
   this.life--;
   wrap(this);
 };
-Bullet.prototype.draw=function(){
+Bullet.prototype.draw = function(){
   ctx.beginPath();
   ctx.arc(this.x,this.y,2,0,Math.PI*2);
   ctx.stroke();
@@ -120,7 +135,8 @@ function Asteroid(x,y,size,isCredit=false){
   for(let i=0;i<14;i++) this.shape.push(rand(0.7,1.3));
 }
 Asteroid.prototype.update=function(){
-  this.x+=this.vx; this.y+=this.vy;
+  this.x+=this.vx;
+  this.y+=this.vy;
   wrap(this);
 };
 Asteroid.prototype.draw=function(){
@@ -170,17 +186,26 @@ function startGame(){
 }
 
 function spawnAsteroids(n){
+  const diff = getDifficulty();
   for(let i=0;i<n;i++){
-    const credit=Math.random()<0.12;
-    Game.asteroids.push(
-      new Asteroid(rand(0,WIDTH),rand(0,HEIGHT),3,credit)
-    );
+    const edge=Math.floor(Math.random()*4);
+    let x,y;
+
+    if(edge===0){ x=rand(0,WIDTH); y=-40; }
+    else if(edge===1){ x=WIDTH+40; y=rand(0,HEIGHT); }
+    else if(edge===2){ x=rand(0,WIDTH); y=HEIGHT+40; }
+    else { x=-40; y=rand(0,HEIGHT); }
+
+    const credit = Math.random() < diff.creditChance;
+    const a = new Asteroid(x,y,3,credit);
+    a.vx *= diff.speed;
+    a.vy *= diff.speed;
+    Game.asteroids.push(a);
   }
 }
 
 /* ========= COLLISIONS ========= */
 function checkCollisions(){
-  // Bullet x Asteroid
   Game.bullets.forEach((b,bi)=>{
     Game.asteroids.forEach((a,ai)=>{
       if(Math.hypot(b.x-a.x,b.y-a.y)<a.radius){
@@ -191,7 +216,7 @@ function checkCollisions(){
           Game.score+=50;
           Game.floatingTexts.push(
             new FloatingText(
-              "Credits: Asteroids (HTML5) — dmcinnes | Mods by Leonardo Dias Gomes (@BULOFK)",
+              "CREDITS: Asteroids (HTML5) by dmcinnes | Remaster by Leonardo Dias Gomes (@BULOFK)",
               a.x,a.y
             )
           );
@@ -202,7 +227,11 @@ function checkCollisions(){
     });
   });
 
-  // Ship x Asteroid
+  const diff = getDifficulty();
+  if(Game.asteroids.length < diff.maxAsteroids){
+    spawnAsteroids(1);
+  }
+
   Game.asteroids.forEach(a=>{
     if(Game.ship.inv<=0 &&
       Math.hypot(Game.ship.x-a.x,Game.ship.y-a.y)<a.radius){
@@ -219,11 +248,13 @@ function checkCollisions(){
 
 /* ========= HUD ========= */
 function drawHUD(){
+  const diff=getDifficulty();
   ctx.font="16px monospace";
   ctx.fillStyle="white";
   ctx.fillText("SCORE: "+Game.score,20,30);
   ctx.fillText("LIVES: "+Game.lives,20,50);
-  ctx.fillText("HIGH: "+Game.high,WIDTH-150,30);
+  ctx.fillText("LEVEL: "+diff.level,20,70);
+  ctx.fillText("HIGH: "+Game.high,WIDTH-160,30);
 }
 
 /* ========= LOOP ========= */
