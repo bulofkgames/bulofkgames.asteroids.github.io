@@ -2,59 +2,40 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Vector Battle (Asteroids HTML5)</title>
+  <title>Vector Battle – Asteroids (HTML5)</title>
 
-  <!-- jQuery (safe version) -->
-  <script src="https://code.jquery.com/jquery-1.7.2.min.js"></script>
-
-  <!-- Game assets -->
-  <script src="vector_battle_regular.typeface.js"></script>
-  <script src="ipad.js"></script>
-  <script src="game.js"></script>
-
+  <!-- Estilo básico -->
   <style>
-    body {
+    html, body {
       margin: 0;
       padding: 0;
-      overflow: hidden;
       background: #000;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
     }
 
-    #canvas {
+    canvas {
       display: block;
-      margin: 0 auto;
-      border: 1px solid #222;
+      margin: auto;
+      background: #000;
+      border: 2px solid #444;
     }
-
-    .button {
-      position: absolute;
-      border: 1px solid #000;
-      background: rgba(255,255,255,0.2);
-      font-weight: bold;
-      user-select: none;
-      cursor: pointer;
-    }
-
-    #left-controls, #right-controls {
-      position: absolute;
-      bottom: 0;
-      display: none;
-    }
-
-    #left-controls { left: 0; }
-    #right-controls { right: 0; }
-
-    #up { width: 200px; height: 100px; bottom: 100px; }
-    #left { width: 100px; height: 100px; bottom: 0; }
-    #right { width: 100px; height: 100px; bottom: 0; left: 100px; }
-    #space { width: 200px; height: 200px; bottom: 0; right: 0; }
   </style>
 </head>
 
 <body>
-  <canvas id="canvas" width="780" height="540"></canvas>
 
-  <!-- 🔒 Domain Protection -->
+  <!-- ⚠️ TAMANHO ORIGINAL DO JOGO -->
+  <canvas id="canvas" width="800" height="600"></canvas>
+
+  <!-- Scripts (ORDEM CORRETA) -->
+  <script src="https://code.jquery.com/jquery-1.7.2.min.js"></script>
+  <script src="vector_battle_regular.typeface.js"></script>
+  <script src="ipad.js"></script>
+  <script src="game.js"></script>
+
+  <!-- 🔒 Proteção de domínio (segura e sem quebrar o jogo) -->
   <script>
     (function () {
       const allowedDomains = [
@@ -69,9 +50,10 @@
       if (!ref) return;
 
       if (!allowedDomains.some(d => ref.includes(d))) {
-        location.href = OFFICIAL_SITE;
+        window.location.replace(OFFICIAL_SITE);
       }
     })();
   </script>
+
 </body>
 </html>
