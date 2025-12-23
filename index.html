@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <title>Vector Battle – Asteroids (HTML5)</title>
 
-<meta name="viewport" content="width=800, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
 html, body {
@@ -20,35 +20,59 @@ canvas {
   display: block;
   margin: auto;
   background: black;
+  outline: none; /* remove foco azul */
 }
+
+.button {
+  position: absolute;
+  border: 1px solid black;
+}
+
+#left-controls { position: absolute; left:1px; bottom:0px; display:none; }
+#right-controls { position: absolute; right:1px; bottom:0px; display:none; }
+#up { width:200px; height:100px; bottom:100px;}
+#left { width:100px; height:100px; bottom:0px;}
+#right { width:100px; height:100px; bottom:0px; left:100px;}
+#space { width:200px; height:200px; bottom:0px; right:0px;}
 </style>
 </head>
 
 <body>
 
-<!-- ⚠️ ID TEM QUE SER EXATAMENTE ESSE -->
-<canvas id="canvas" width="800" height="600"></canvas>
+<div id="game-container">
+  <canvas id="canvas" width="780" height="540" tabindex="0"></canvas>
+
+  <!-- controles mobile -->
+  <div id="left-controls">
+    <div id="up" class='button'>THRUST</div>
+    <div id="left" class='button'>LEFT</div>
+    <div id="right" class='button'>RIGHT</div>
+  </div>
+  <div id="right-controls">
+    <div id="space" class='button'>FIRE</div>
+  </div>
+</div>
 
 <!-- =========================
-     SCRIPTS (ORDEM ORIGINAL)
+     SCRIPTS ORIGINAIS
      ========================= -->
-
-<!-- ⚠️ USE A MESMA VERSÃO DO PROJETO -->
 <script src="jquery-1.4.1.min.js"></script>
-
 <script src="vector_battle_regular.typeface.js"></script>
 <script src="ipad.js"></script>
-
-<!-- GAME -->
 <script src="game.js"></script>
 
 <!-- =========================
-     FOCO SIMPLES (SEM QUEBRAR)
+     FOCO NO CANVAS
      ========================= -->
 <script>
-  // Clique para garantir foco (sem interferir no jogo)
-  document.body.addEventListener("click", function () {
-    window.focus();
+  const canvas = document.getElementById("canvas");
+
+  canvas.addEventListener("click", function() {
+    canvas.focus();
+  });
+
+  window.addEventListener("load", function() {
+    canvas.focus();
   });
 </script>
 
