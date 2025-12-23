@@ -1,222 +1,193 @@
-/* 
-========================================
- Canvas Asteroids (HTML5)
- Original code: Doug McInnes (2010)
- Arcade restoration by:
- Leonardo Dias Gomes
- YouTube: @BULOFK
-========================================
-*/
-
-/* ================= CONSTANTS ================= */
-
-const MAX_SPEED = 220;
-const ACCELERATION = 200;
-const FRICTION = 0.92;
-
-const ROT_STEP = 4; // giro arcade preciso
-
-const BULLET_SPEED = 500;
-const BULLET_LIFE = 40;
-
-const ASTEROID_SPEED = 60;
-
-/* ================= INPUT ================= */
-
-const KEY = {};
-
-window.addEventListener("keydown", e => {
-  e.preventDefault();
-  KEY[e.code] = true;
-});
-
-window.addEventListener("keyup", e => {
-  e.preventDefault();
-  KEY[e.code] = false;
-});
-
-/* ================= GAME ================= */
+/* ========================================
+ ASTEROIDS HTML5 — ARCADE EDITION
+ Original: dmcinnes
+ Remaster: Leonardo Dias Gomes
+ YT: @BULOFK
+======================================== */
 
 const Game = {
-  sprites: [],
   width: 800,
   height: 600,
-  score: 0
+  sprites: [],
+  bullets: [],
+  asteroids: [],
+  lives: 3,
+  score: 0,
+  highScore: localStorage.getItem("highscore") || 0,
+  state: "menu",
+  creditsUnlocked: false,
+  showCredits: false
 };
 
-/* ================= BASE SPRITE ================= */
+/* ========= INPUT ========= */
+const KEY = {};
+addEventListener("keydown", e => KEY[e.code] = true);
+addEventListener("keyup", e => KEY[e.code] = false);
 
-function Sprite() {
-  this.x = 0;
-  this.y = 0;
-  this.rot = 0;
-  this.vel = { x: 0, y: 0 };
-  this.points = [];
-  this.visible = true;
+/* ========= SOUND ========= */
+const Sound = {
+  shoot: new Audio("sounds/shoot.wav"),
+  bang: new Audio("sounds/bang.wav"),
+  ship: new Audio("sounds/ship.wav")
+};
+
+/* ========= BASE ========= */
+function wrap(o) {
+  if (o.x < 0) o.x += Game.width;
+  if (o.x > Game.width) o.x -= Game.width;
+  if (o.y < 0) o.y += Game.height;
+  if (o.y > Game.height) o.y -= Game.height;
 }
 
-Sprite.prototype.update = function () {
-  this.x += this.vel.x;
-  this.y += this.vel.y;
-
-  if (this.x < 0) this.x += Game.width;
-  if (this.x > Game.width) this.x -= Game.width;
-  if (this.y < 0) this.y += Game.height;
-  if (this.y > Game.height) this.y -= Game.height;
-};
-
-Sprite.prototype.draw = function (ctx) {
-  ctx.save();
-  ctx.translate(this.x, this.y);
-  ctx.rotate(this.rot * Math.PI / 180);
-  ctx.beginPath();
-  ctx.moveTo(this.points[0], this.points[1]);
-  for (let i = 2; i < this.points.length; i += 2) {
-    ctx.lineTo(this.points[i], this.points[i + 1]);
-  }
-  ctx.closePath();
-  ctx.stroke();
-  ctx.restore();
-};
-
-/* ================= SHIP ================= */
-
+/* ========= SHIP ========= */
 function Ship() {
-  Sprite.call(this);
   this.x = Game.width / 2;
   this.y = Game.height / 2;
-  this.points = [-6, 6, 0, -12, 6, 6];
-  this.cooldown = false;
+  this.rot = 0;
+  this.vx = 0;
+  this.vy = 0;
 }
 
-Ship.prototype = Object.create(Sprite.prototype);
+Ship.prototype.update = function () {
+  if (KEY.ArrowLeft) this.rot -= 4;
+  if (KEY.ArrowRight) this.rot += 4;
 
-Ship.prototype.control = function () {
-  if (KEY["ArrowLeft"]) this.rot -= ROT_STEP;
-  if (KEY["ArrowRight"]) this.rot += ROT_STEP;
-
-  if (KEY["ArrowUp"]) {
-    this.vel.x += Math.sin(this.rot * Math.PI / 180) * ACCELERATION / 60;
-    this.vel.y -= Math.cos(this.rot * Math.PI / 180) * ACCELERATION / 60;
+  if (KEY.ArrowUp) {
+    this.vx += Math.sin(this.rot * Math.PI / 180) * 0.2;
+    this.vy -= Math.cos(this.rot * Math.PI / 180) * 0.2;
   }
 
-  this.vel.x *= FRICTION;
-  this.vel.y *= FRICTION;
-
-  let speed = Math.hypot(this.vel.x, this.vel.y);
-  if (speed > MAX_SPEED / 60) {
-    let s = (MAX_SPEED / 60) / speed;
-    this.vel.x *= s;
-    this.vel.y *= s;
+  if (KEY.Space && !this.cool) {
+    Game.bullets.push(new Bullet(this));
+    Sound.shoot.cloneNode().play();
+    this.cool = true;
   }
+  if (!KEY.Space) this.cool = false;
 
-  if (KEY["Space"] && !this.cooldown) {
-    Game.sprites.push(new Bullet(this));
-    this.cooldown = true;
-  }
-  if (!KEY["Space"]) this.cooldown = false;
+  this.vx *= 0.99;
+  this.vy *= 0.99;
+
+  this.x += this.vx;
+  this.y += this.vy;
+  wrap(this);
 };
 
-/* ================= BULLET ================= */
+Ship.prototype.draw = function (c) {
+  c.save();
+  c.translate(this.x, this.y);
+  c.rotate(this.rot * Math.PI / 180);
+  c.beginPath();
+  c.moveTo(0, -12);
+  c.lineTo(6, 6);
+  c.lineTo(-6, 6);
+  c.closePath();
+  c.stroke();
+  c.restore();
+};
 
-function Bullet(ship) {
-  Sprite.call(this);
-  this.x = ship.x;
-  this.y = ship.y;
-  this.life = BULLET_LIFE;
-  this.points = [0, -2, 0, 2];
-
-  this.vel.x = Math.sin(ship.rot * Math.PI / 180) * BULLET_SPEED / 60;
-  this.vel.y = -Math.cos(ship.rot * Math.PI / 180) * BULLET_SPEED / 60;
+/* ========= BULLET ========= */
+function Bullet(s) {
+  this.x = s.x;
+  this.y = s.y;
+  this.vx = Math.sin(s.rot * Math.PI / 180) * 6;
+  this.vy = -Math.cos(s.rot * Math.PI / 180) * 6;
+  this.life = 60;
 }
-
-Bullet.prototype = Object.create(Sprite.prototype);
 
 Bullet.prototype.update = function () {
-  this.x += this.vel.x;
-  this.y += this.vel.y;
+  this.x += this.vx;
+  this.y += this.vy;
   this.life--;
-  if (this.life <= 0) this.visible = false;
+  wrap(this);
 };
 
-/* ================= ASTEROID ================= */
+Bullet.prototype.draw = function (c) {
+  c.beginPath();
+  c.arc(this.x, this.y, 2, 0, Math.PI * 2);
+  c.stroke();
+};
 
-function Asteroid(x, y, size = 3) {
-  Sprite.call(this);
+/* ========= ASTEROID ========= */
+function Asteroid(x, y, size = 3, blue = false) {
   this.x = x;
   this.y = y;
   this.size = size;
+  this.blue = blue;
+  const a = Math.random() * Math.PI * 2;
+  this.vx = Math.cos(a) * 1.2;
+  this.vy = Math.sin(a) * 1.2;
+}
 
-  const angle = Math.random() * Math.PI * 2;
-  this.vel.x = Math.cos(angle) * ASTEROID_SPEED / 60;
-  this.vel.y = Math.sin(angle) * ASTEROID_SPEED / 60;
-
-  this.points = [];
-  const radius = size * 15;
-
+Asteroid.prototype.draw = function (c) {
+  c.strokeStyle = this.blue ? "#3af" : "#fff";
+  c.beginPath();
   for (let i = 0; i < 8; i++) {
-    const a = (Math.PI * 2 / 8) * i;
-    const r = radius + Math.random() * 8;
-    this.points.push(Math.cos(a) * r, Math.sin(a) * r);
+    const a = i / 8 * Math.PI * 2;
+    const r = this.size * 15 + Math.random() * 4;
+    c.lineTo(this.x + Math.cos(a) * r, this.y + Math.sin(a) * r);
   }
-}
+  c.closePath();
+  c.stroke();
+  c.strokeStyle = "#fff";
+};
 
-Asteroid.prototype = Object.create(Sprite.prototype);
+Asteroid.prototype.update = function () {
+  this.x += this.vx;
+  this.y += this.vy;
+  wrap(this);
+};
 
-/* ================= COLLISION ================= */
-
-function hit(a, b) {
-  return Math.hypot(a.x - b.x, a.y - b.y) < 20;
-}
-
-/* ================= BOOT ================= */
-
+/* ========= GAME LOOP ========= */
 window.onload = () => {
   const canvas = document.getElementById("canvas");
+  const c = canvas.getContext("2d");
   canvas.width = Game.width;
   canvas.height = Game.height;
-  const ctx = canvas.getContext("2d");
 
-  ctx.strokeStyle = "#fff";
-  ctx.lineWidth = 2;
+  let ship;
 
-  const ship = new Ship();
-  Game.sprites.push(ship);
+  function startGame() {
+    Game.state = "play";
+    Game.score = 0;
+    Game.lives = 3;
+    Game.bullets = [];
+    Game.asteroids = [];
+    ship = new Ship();
 
-  for (let i = 0; i < 5; i++) {
-    Game.sprites.push(new Asteroid(Math.random() * 800, Math.random() * 600));
+    for (let i = 0; i < 5; i++)
+      Game.asteroids.push(new Asteroid(Math.random()*800, Math.random()*600));
   }
 
   function loop() {
-    ctx.clearRect(0, 0, 800, 600);
+    c.clearRect(0,0,800,600);
 
-    ship.control();
-
-    for (let i = Game.sprites.length - 1; i >= 0; i--) {
-      const s = Game.sprites[i];
-      s.update();
-      s.draw(ctx);
-
-      if (s instanceof Bullet) {
-        for (let j = Game.sprites.length - 1; j >= 0; j--) {
-          const a = Game.sprites[j];
-          if (a instanceof Asteroid && hit(s, a)) {
-            s.visible = false;
-            a.visible = false;
-            Game.score += [0, 100, 50, 20][a.size];
-
-            if (a.size > 1) {
-              Game.sprites.push(new Asteroid(a.x, a.y, a.size - 1));
-              Game.sprites.push(new Asteroid(a.x, a.y, a.size - 1));
-            }
-          }
-        }
-      }
-
-      if (!s.visible) Game.sprites.splice(i, 1);
+    if (Game.state === "menu") {
+      c.fillText("ASTEROIDS", 350, 250);
+      c.fillText("PRESS SPACE TO START", 300, 300);
+      if (KEY.Space) startGame();
     }
 
-    ctx.fillText("SCORE: " + Game.score, 20, 20);
+    if (Game.state === "play") {
+      ship.update();
+      ship.draw(c);
+
+      Game.bullets.forEach(b => { b.update(); b.draw(c); });
+      Game.asteroids.forEach(a => { a.update(); a.draw(c); });
+
+      if (Game.score >= 5000 && !Game.creditsUnlocked) {
+        Game.asteroids.push(new Asteroid(400,300,3,true));
+        Game.creditsUnlocked = true;
+      }
+
+      if (Game.showCredits) {
+        c.fillText("Asteroids (HTML5) — dmcinnes", 20, 560);
+        c.fillText("Remaster: Leonardo Dias Gomes", 20, 580);
+        c.fillText("YT: @BULOFK", 20, 600);
+      }
+
+      c.fillText("SCORE: "+Game.score, 20,20);
+      c.fillText("LIVES: "+Game.lives, 700,20);
+    }
 
     requestAnimationFrame(loop);
   }
