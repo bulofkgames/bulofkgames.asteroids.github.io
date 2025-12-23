@@ -1,14 +1,21 @@
 /* =====================================
- ASTEROIDS HTML5 — ARCADE FINAL
+ ASTEROIDS HTML5 — ARCADE EDITION
  Original: dmcinnes
- Remaster: Leonardo Dias Gomes
- YT: @BULOFK
+ Remaster & Expansion:
+ Leonardo Dias Gomes
+ YouTube: @BULOFK
 ===================================== */
 
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 canvas.width = 800;
 canvas.height = 600;
+
+/* ========= CANVAS STYLE ========= */
+ctx.strokeStyle = "#fff";
+ctx.fillStyle = "#fff";
+ctx.lineWidth = 2;
+ctx.font = "20px monospace";
 
 /* ========= GAME STATE ========= */
 const Game = {
@@ -18,13 +25,25 @@ const Game = {
   asteroids: [],
   bullets: [],
   particles: [],
-  ship: null
+  ship: null,
+  showCredits: false,
+  creditTimer: 0
 };
 
 /* ========= INPUT ========= */
 const KEY = {};
-addEventListener("keydown", e => KEY[e.code] = true);
-addEventListener("keyup", e => KEY[e.code] = false);
+let SPACE_PRESSED = false;
+
+addEventListener("keydown", e => {
+  if (!KEY[e.code]) {
+    if (e.code === "Space") SPACE_PRESSED = true;
+  }
+  KEY[e.code] = true;
+});
+
+addEventListener("keyup", e => {
+  KEY[e.code] = false;
+});
 
 /* ========= UTILS ========= */
 function rand(min, max) {
@@ -42,12 +61,12 @@ function wrap(o) {
   if (o.y > 600) o.y -= 600;
 }
 
-/* ========= PARTICLE ========= */
+/* ========= PARTICLES ========= */
 function Particle(x, y) {
   this.x = x;
   this.y = y;
-  this.vx = rand(-3, 3);
-  this.vy = rand(-3, 3);
+  this.vx = rand(-4, 4);
+  this.vy = rand(-4, 4);
   this.life = 30;
 }
 
@@ -99,7 +118,7 @@ Ship.prototype.update = function () {
 };
 
 Ship.prototype.draw = function () {
-  if (this.invincible % 20 < 10) return;
+  if (this.invincible > 0 && this.invincible % 20 < 10) return;
 
   ctx.save();
   ctx.translate(this.x, this.y);
@@ -136,14 +155,21 @@ Bullet.prototype.draw = function () {
 };
 
 /* ========= ASTEROID ========= */
-function Asteroid(x, y, size) {
+function Asteroid(x, y, size, isCredit = false) {
   this.x = x;
   this.y = y;
   this.size = size;
-  this.radius = size * 15;
-  const a = rand(0, Math.PI * 2);
-  this.vx = Math.cos(a) * rand(1, 2);
-  this.vy = Math.sin(a) * rand(1, 2);
+  this.radius = size * 18;
+  this.isCredit = isCredit;
+
+  this.vx = rand(-2, 2);
+  this.vy = rand(-2, 2);
+
+  this.points = [];
+  const verts = 10;
+  for (let i = 0; i < verts; i++) {
+    this.points.push(rand(0.6, 1.2));
+  }
 }
 
 Asteroid.prototype.update = function () {
@@ -153,16 +179,21 @@ Asteroid.prototype.update = function () {
 };
 
 Asteroid.prototype.draw = function () {
+  ctx.save();
+  ctx.translate(this.x, this.y);
   ctx.beginPath();
-  for (let i = 0; i < 8; i++) {
-    const a = i / 8 * Math.PI * 2;
-    ctx.lineTo(
-      this.x + Math.cos(a) * this.radius,
-      this.y + Math.sin(a) * this.radius
-    );
+
+  for (let i = 0; i < this.points.length; i++) {
+    const angle = (i / this.points.length) * Math.PI * 2;
+    const r = this.radius * this.points[i];
+    ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
   }
+
   ctx.closePath();
+  ctx.strokeStyle = this.isCredit ? "#4af" : "#fff";
   ctx.stroke();
+  ctx.strokeStyle = "#fff";
+  ctx.restore();
 };
 
 /* ========= START ========= */
@@ -174,20 +205,33 @@ function startGame() {
   Game.bullets = [];
   Game.particles = [];
   Game.ship = new Ship();
+  Game.showCredits = false;
 
   for (let i = 0; i < 5; i++) {
-    Game.asteroids.push(new Asteroid(rand(0,800), rand(0,600), 3));
+    Game.asteroids.push(
+      new Asteroid(rand(0,800), rand(0,600), 3)
+    );
   }
+
+  // Asteroide azul de créditos
+  Game.asteroids.push(
+    new Asteroid(100, 100, 2, true)
+  );
 }
 
 /* ========= LOOP ========= */
 function loop() {
-  ctx.clearRect(0,0,800,600);
+  ctx.clearRect(0, 0, 800, 600);
 
   if (Game.state === "menu") {
-    ctx.fillText("ASTEROIDS", 360, 250);
-    ctx.fillText("PRESS SPACE TO START", 300, 300);
-    if (KEY.Space) startGame();
+    ctx.textAlign = "center";
+    ctx.fillText("ASTEROIDS", 400, 240);
+    ctx.fillText("PRESS SPACE TO START", 400, 300);
+
+    if (SPACE_PRESSED) {
+      SPACE_PRESSED = false;
+      startGame();
+    }
   }
 
   if (Game.state === "play") {
@@ -200,35 +244,40 @@ function loop() {
     Game.asteroids.forEach(a => a.update());
     Game.asteroids.forEach(a => a.draw());
 
+    Game.particles = Game.particles.filter(p => p.life > 0);
     Game.particles.forEach(p => { p.update(); p.draw(); });
 
-    // COLLISIONS
     Game.asteroids.forEach((a, ai) => {
       Game.bullets.forEach((b, bi) => {
         if (dist(a, b) < a.radius) {
           Game.bullets.splice(bi,1);
           Game.asteroids.splice(ai,1);
-          Game.score += a.size === 3 ? 20 : a.size === 2 ? 50 : 100;
 
-          for (let i=0;i<15;i++)
+          for (let i=0;i<20;i++)
             Game.particles.push(new Particle(a.x,a.y));
 
-          if (a.size > 1) {
-            Game.asteroids.push(new Asteroid(a.x,a.y,a.size-1));
-            Game.asteroids.push(new Asteroid(a.x,a.y,a.size-1));
+          if (a.isCredit) {
+            Game.showCredits = true;
+            Game.creditTimer = 300;
           }
         }
       });
-
-      if (dist(a, Game.ship) < a.radius && Game.ship.invincible <= 0) {
-        Game.lives--;
-        Game.ship = new Ship();
-        if (Game.lives <= 0) Game.state = "menu";
-      }
     });
 
-    ctx.fillText("SCORE: "+Game.score, 20,20);
-    ctx.fillText("LIVES: "+Game.lives, 700,20);
+    ctx.textAlign = "left";
+    ctx.fillText("SCORE: " + Game.score, 20, 30);
+    ctx.fillText("LIVES: " + Game.lives, 680, 30);
+
+    if (Game.showCredits) {
+      ctx.fillStyle = "#4af";
+      ctx.fillText(
+        "Asteroids (HTML5) — dmcinnes | Remaster: Leonardo Dias Gomes | YT:@BULOFK",
+        20, 580
+      );
+      ctx.fillStyle = "#fff";
+      Game.creditTimer--;
+      if (Game.creditTimer <= 0) Game.showCredits = false;
+    }
   }
 
   requestAnimationFrame(loop);
