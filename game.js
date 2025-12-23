@@ -10,10 +10,10 @@
 
 /* ================= CONSTANTS ================= */
 
-var MAX_SPEED = 160;
-var ROT_SPEED = 80;
+var MAX_SPEED = 80;
+var ROT_SPEED = 40;
 var ACCELERATION = 50;
-var FRICTION = 1.98;
+var FRICTION = 2.98;
 
 /* ================= INPUT ================= */
 
