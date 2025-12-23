@@ -12,7 +12,7 @@
 
 var MAX_SPEED = 300;
 var ROT_SPEED = 180;
-var ACCELERATION = 200;
+var ACCELERATION = 150;
 var FRICTION = 0.98;
 
 /* ================= INPUT ================= */
