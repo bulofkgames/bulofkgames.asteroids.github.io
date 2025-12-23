@@ -1,105 +1,77 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Vector Battle – Asteroids (HTML5)</title>
+<meta charset="UTF-8">
+<title>Vector Battle – Asteroids (HTML5)</title>
 
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=800, initial-scale=1.0">
 
-  <!-- Estilo básico -->
-  <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      background: #000;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
+<style>
+html, body {
+  margin: 0;
+  padding: 0;
+  background: black;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
 
-    canvas {
-      background: #000;
-      border: 2px solid #444;
-      outline: none; /* remove foco azul */
-    }
-
-    /* Mensagem de foco (opcional, mas útil) */
-    #hint {
-      position: absolute;
-      bottom: 12px;
-      color: #888;
-      font-family: monospace;
-      font-size: 12px;
-      text-align: center;
-      width: 100%;
-      pointer-events: none;
-    }
-  </style>
+canvas {
+  display: block;
+  margin: auto;
+  background: black;
+}
+</style>
 </head>
 
 <body>
 
-  <!-- ✅ CANVAS DO JOGO (OBRIGATÓRIO) -->
-  <canvas id="canvas" width="800" height="600" tabindex="0"></canvas>
+<!-- ⚠️ ID TEM QUE SER EXATAMENTE ESSE -->
+<canvas id="canvas" width="800" height="600"></canvas>
 
-  <div id="hint">Click on the game, then press SPACE to start</div>
+<!-- =========================
+     SCRIPTS (ORDEM ORIGINAL)
+     ========================= -->
 
-  <!-- =========================
-       SCRIPTS (ORDEM CORRETA)
-       ========================= -->
+<!-- ⚠️ USE A MESMA VERSÃO DO PROJETO -->
+<script src="jquery-1.4.1.min.js"></script>
 
-  <!-- jQuery antigo (mantido por compatibilidade do projeto original) -->
-  <script src="https://code.jquery.com/jquery-1.7.2.min.js"></script>
+<script src="vector_battle_regular.typeface.js"></script>
+<script src="ipad.js"></script>
 
-  <!-- Font / helpers originais -->
-  <script src="vector_battle_regular.typeface.js"></script>
-  <script src="ipad.js"></script>
+<!-- GAME -->
+<script src="game.js"></script>
 
-  <!-- 🎮 GAME PRINCIPAL -->
-  <script src="game.js"></script>
+<!-- =========================
+     FOCO SIMPLES (SEM QUEBRAR)
+     ========================= -->
+<script>
+  // Clique para garantir foco (sem interferir no jogo)
+  document.body.addEventListener("click", function () {
+    window.focus();
+  });
+</script>
 
-  <!-- =========================
-       FOCO NO CANVAS (IMPORTANTE)
-       ========================= -->
+<!-- 🔒 Domain protection -->
   <script>
-    const canvas = document.getElementById("canvas");
+  (function () {
+    const allowedDomains = [
+      "bulofkgames.blogspot.com",
+      "thebulofkproject.blogspot.com",
+      "github.io"
+    ];
 
-    // Garante foco para teclado (SPACE funciona)
-    canvas.addEventListener("click", () => {
-      canvas.focus();
-    });
+    const OFFICIAL_SITE = "https://bulofkgames.blogspot.com/";
+    const ref = document.referrer.toLowerCase();
 
-    // Foco automático ao carregar (quando possível)
-    window.addEventListener("load", () => {
-      canvas.focus();
-    });
-  </script>
+    if (!ref) return;
 
-  <!-- =========================
-       🔒 PROTEÇÃO DE DOMÍNIO
-       ========================= -->
-  <script>
-    (function () {
-      const allowedDomains = [
-        "bulofkgames.blogspot.com",
-        "thebulofkproject.blogspot.com",
-        "github.io"
-      ];
+    const allowed = allowedDomains.some(domain => ref.includes(domain));
 
-      const OFFICIAL_SITE = "https://bulofkgames.blogspot.com/";
-      const ref = document.referrer.toLowerCase();
-
-      // Se acesso direto (GitHub Pages), não bloqueia
-      if (!ref) return;
-
-      // Se veio de domínio não autorizado → redireciona
-      if (!allowedDomains.some(d => ref.includes(d))) {
-        window.location.replace(OFFICIAL_SITE);
-      }
-    })();
+    if (!allowed) {
+      window.location.replace(OFFICIAL_SITE);
+    }
+  })();
   </script>
 
 </body>
