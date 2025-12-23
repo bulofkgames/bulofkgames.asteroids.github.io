@@ -1,309 +1,209 @@
 /*
 ========================================
  Canvas Asteroids (HTML5)
- Original code: Doug McInnes (2010)
- Restored & fixed for modern browsers by:
- Leonardo Dias Gomes
- YouTube: @BULOFK
+ Baseado no Asteroids clássico
+ Correção total e modernização:
+ Leonardo Dias Gomes (@BULOFK)
 ========================================
 */
 
-/* ================= CONSTANTS ================= */
+/* ================= CONSTANTES ================= */
 
-var MAX_SPEED = 220;
-var ROT_SPEED = 180;    // degrees per "unit"
-var ACCELERATION = 200; // px per "unit"
-var FRICTION = 0.92;
+const MAX_SPEED = 220;
+const ROT_SPEED = 180;
+const ACCELERATION = 200;
+const FRICTION = 0.92;
 
-var BULLET_SPEED = 500; // px per "unit"
-var BULLET_LIFE = 60;   // frames (approx)
+const BULLET_SPEED = 500;
+const BULLET_LIFE = 60;
+
+const ASTEROID_SPEED = 60;
+const ASTEROID_COUNT = 5;
 
 /* ================= INPUT ================= */
 
-var KEY_CODES = {
-  32: 'space',
-  37: 'left',
-  38: 'up',
-  39: 'right'
+const KEY = {};
+window.addEventListener("keydown", e => KEY[e.code] = true);
+window.addEventListener("keyup", e => KEY[e.code] = false);
+
+/* ================= CANVAS ================= */
+
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+canvas.width = 800;
+canvas.height = 600;
+
+ctx.strokeStyle = "#fff";
+ctx.lineWidth = 2;
+
+/* ================= GAME STATE ================= */
+
+let bullets = [];
+let asteroids = [];
+let score = 0;
+
+/* ================= SHIP ================= */
+
+const ship = {
+  x: canvas.width / 2,
+  y: canvas.height / 2,
+  rot: 0,
+  velX: 0,
+  velY: 0,
+  shooting: false
 };
 
-var KEY_STATUS = {};
-for (var code in KEY_CODES) KEY_STATUS[KEY_CODES[code]] = false;
+/* ================= BULLET ================= */
 
-window.addEventListener('keydown', function (e) {
-  if (KEY_CODES[e.keyCode] !== undefined) {
-    e.preventDefault();
-    KEY_STATUS[KEY_CODES[e.keyCode]] = true;
-  }
-});
-
-window.addEventListener('keyup', function (e) {
-  if (KEY_CODES[e.keyCode] !== undefined) {
-    e.preventDefault();
-    KEY_STATUS[KEY_CODES[e.keyCode]] = false;
-  }
-});
-
-/* ================= SPRITE (base) ================= */
-
-function Sprite() {
-  this.visible = false;
-
-  this.x = 0;
-  this.y = 0;
-  this.rot = 0;   // degrees
-  this.scale = 1;
-
-  this.vel = { x: 0, y: 0, rot: 0 };
-  this.acc = { x: 0, y: 0 };
-
-  this.name = '';
-  this.points = [];
-
-  this.init = function (name, points) {
-    this.name = name || '';
-    this.points = points || [];
-  };
-
-  // default run: move + transformed draw
-  this.run = function (delta) {
-    if (!this.visible) return;
-    this.move(delta);
-
-    // each sprite must save/restore its transform and draw isolated paths
-    this.context.save();
-    this.context.translate(this.x, this.y);
-    this.context.rotate(this.rot * Math.PI / 180);
-    this.context.scale(this.scale, this.scale);
-
-    // ensure we don't leak a previous path
-    this.context.beginPath();
-    this.draw();
-    // stroke() / fill() must be called inside draw() or here
-    this.context.restore();
-  };
-
-  // move uses acceleration, friction, limit, wrapping
-  this.move = function (delta) {
-    // apply acceleration
-    this.vel.x += this.acc.x * delta;
-    this.vel.y += this.acc.y * delta;
-
-    // apply friction
-    this.vel.x *= FRICTION;
-    this.vel.y *= FRICTION;
-
-    // limit speed
-    var speed = Math.sqrt(this.vel.x * this.vel.x + this.vel.y * this.vel.y);
-    if (speed > MAX_SPEED) {
-      var s = MAX_SPEED / speed;
-      this.vel.x *= s;
-      this.vel.y *= s;
-    }
-
-    // update position
-    this.x += this.vel.x * delta;
-    this.y += this.vel.y * delta;
-
-    // rotate
-    this.rot = (this.rot + this.vel.rot * delta + 360) % 360;
-
-    // wrap screen
-    if (this.x < 0) this.x += Game.canvasWidth;
-    if (this.x > Game.canvasWidth) this.x -= Game.canvasWidth;
-    if (this.y < 0) this.y += Game.canvasHeight;
-    if (this.y > Game.canvasHeight) this.y -= Game.canvasHeight;
-  };
-
-  // default draw uses polyline from points
-  this.draw = function () {
-    if (!this.points || this.points.length === 0) return;
-    var ctx = this.context;
-    ctx.beginPath();
-    ctx.moveTo(this.points[0], this.points[1]);
-    for (var i = 2; i < this.points.length; i += 2) {
-      ctx.lineTo(this.points[i], this.points[i + 1]);
-    }
-    ctx.closePath();
-    ctx.stroke();
-  };
+function shoot() {
+  bullets.push({
+    x: ship.x,
+    y: ship.y,
+    vx: Math.sin(ship.rot) * BULLET_SPEED,
+    vy: -Math.cos(ship.rot) * BULLET_SPEED,
+    life: BULLET_LIFE
+  });
 }
 
-/* ================= BULLET (standalone/isolated) ================= */
+/* ================= ASTEROID ================= */
 
-function Bullet(x, y, rot) {
-  // don't rely on prototype draw for bullet; isolate entirely
-  Sprite.call(this);
-  this.init('bullet', [0, -2, 0, 2]);
-
-  this.visible = true;
-  this.x = x;
-  this.y = y;
-  this.rot = rot;
-  this.life = BULLET_LIFE;
-
-  // velocity in px per 'unit'
-  this.vel.x = Math.sin(rot * Math.PI / 180) * BULLET_SPEED;
-  this.vel.y = -Math.cos(rot * Math.PI / 180) * BULLET_SPEED;
-
-  // override run to isolate drawing and movement (safest)
-  this.run = function (delta) {
-    if (!this.visible) return;
-
-    // move bullet (no friction for classic bullet)
-    this.x += this.vel.x * delta;
-    this.y += this.vel.y * delta;
-
-    this.life--;
-    if (this.life <= 0) {
-      this.visible = false;
-      return;
-    }
-
-    // wrap
-    if (this.x < 0) this.x += Game.canvasWidth;
-    if (this.x > Game.canvasWidth) this.x -= Game.canvasWidth;
-    if (this.y < 0) this.y += Game.canvasHeight;
-    if (this.y > Game.canvasHeight) this.y -= Game.canvasHeight;
-
-    // isolated draw
-    this.context.save();
-    this.context.translate(this.x, this.y);
-    this.context.beginPath();
-    this.context.moveTo(0, -2);
-    this.context.lineTo(0, 2);
-    this.context.stroke();
-    this.context.restore();
-  };
+function spawnAsteroid() {
+  const angle = Math.random() * Math.PI * 2;
+  asteroids.push({
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height,
+    vx: Math.cos(angle) * ASTEROID_SPEED,
+    vy: Math.sin(angle) * ASTEROID_SPEED,
+    r: 30
+  });
 }
 
-/* inherit context slot from Sprite so we can assign later */
-Bullet.prototype = Object.create(Sprite.prototype);
-Bullet.prototype.constructor = Bullet;
+for (let i = 0; i < ASTEROID_COUNT; i++) spawnAsteroid();
 
-/* ================= TEXT (SAFE) ================= */
-/* Simplified: use canvas text to avoid path contamination */
-var Text = {
-  context: null,
-  face: null,
+/* ================= UPDATE ================= */
 
-  renderText: function (txt, size, x, y) {
-    if (!this.context) return;
-    var ctx = this.context;
-    ctx.save();
-    // choose a readable font — you can change later
-    ctx.font = (size + "px monospace");
-    ctx.textAlign = "left";
-    ctx.textBaseline = "top";
-    ctx.fillStyle = "#ffffff";
-    ctx.fillText(txt, x, y);
-    ctx.restore();
+function update(delta) {
+
+  // ROTATION
+  if (KEY["ArrowLeft"]) ship.rot -= ROT_SPEED * delta;
+  if (KEY["ArrowRight"]) ship.rot += ROT_SPEED * delta;
+
+  // ACCELERATION
+  if (KEY["ArrowUp"]) {
+    ship.velX += Math.sin(ship.rot) * ACCELERATION * delta;
+    ship.velY -= Math.cos(ship.rot) * ACCELERATION * delta;
   }
-};
 
-/* ================= GAME ================= */
+  // FRICTION
+  ship.velX *= FRICTION;
+  ship.velY *= FRICTION;
 
-var Game = {
-  sprites: [],
-  canvasWidth: 800,
-  canvasHeight: 600
-};
-
-/* ================= BOOT ================= */
-
-window.onload = function () {
-  var canvas = document.getElementById('canvas');
-  if (!canvas) {
-    console.error("canvas element with id='canvas' not found.");
-    return;
+  // LIMIT SPEED
+  const speed = Math.hypot(ship.velX, ship.velY);
+  if (speed > MAX_SPEED) {
+    ship.velX *= MAX_SPEED / speed;
+    ship.velY *= MAX_SPEED / speed;
   }
-  canvas.width = 800;
-  canvas.height = 600;
 
-  var ctx = canvas.getContext('2d');
+  ship.x += ship.velX * delta;
+  ship.y += ship.velY * delta;
 
-  // drawing style
-  ctx.strokeStyle = "#ffffff";
-  ctx.lineWidth = 2;
-  ctx.lineJoin = "round";
-  ctx.lineCap = "round";
-  ctx.fillStyle = "#ffffff";
+  wrap(ship);
 
-  // important: assign to prototypes & Text
-  Sprite.prototype.context = ctx;
-  Bullet.prototype.context = ctx;
-  Text.context = ctx;
+  // SHOOT
+  if (KEY["Space"] && !ship.shooting) {
+    ship.shooting = true;
+    shoot();
+  }
+  if (!KEY["Space"]) ship.shooting = false;
 
-  Game.canvasWidth = canvas.width;
-  Game.canvasHeight = canvas.height;
+  // BULLETS
+  bullets = bullets.filter(b => {
+    b.x += b.vx * delta;
+    b.y += b.vy * delta;
+    b.life--;
+    wrap(b);
+    return b.life > 0;
+  });
 
-  // create ship
-  var ship = new Sprite();
-  // classic small triangle: left-bottom, top, right-bottom
-  ship.init('ship', [-6, 6, 0, -12, 6, 6]);
-  ship.visible = true;
-  ship.x = Game.canvasWidth / 2;
-  ship.y = Game.canvasHeight / 2;
-  ship.shooting = false; // prevent continuous fire on hold
-  Game.sprites.push(ship);
+  // ASTEROIDS
+  asteroids.forEach(a => {
+    a.x += a.vx * delta;
+    a.y += a.vy * delta;
+    wrap(a);
+  });
 
-  // timing
-  var last = performance.now();
-
-  function loop(now) {
-    var delta = (now - last) / 16.666; // ~1 at 60fps
-    if (delta <= 0) delta = 1;
-    last = now;
-
-    // reset transforms and fully clear the canvas (prevents ghosting)
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // make sure path state is clean before any drawing
-    ctx.beginPath();
-
-    // CONTROLS -> update ship.vel.rot and ship.acc
-    // rotation: vel.rot is degrees per unit so move() multiplies by delta
-    if (KEY_STATUS.left) ship.vel.rot = -ROT_SPEED;
-    else if (KEY_STATUS.right) ship.vel.rot = ROT_SPEED;
-    else ship.vel.rot = 0;
-
-    // acceleration: convert ship.rot (deg) to vector
-    if (KEY_STATUS.up) {
-      ship.acc.x = Math.sin(ship.rot * Math.PI / 180) * ACCELERATION;
-      ship.acc.y = -Math.cos(ship.rot * Math.PI / 180) * ACCELERATION;
-    } else {
-      ship.acc.x = 0;
-      ship.acc.y = 0;
-    }
-
-    // SHOOT (one per keypress)
-    if (KEY_STATUS.space && !ship.shooting) {
-      ship.shooting = true;
-      var b = new Bullet(ship.x, ship.y, ship.rot);
-      // ensure bullet has the same context
-      b.context = ctx;
-      Game.sprites.push(b);
-    }
-    if (!KEY_STATUS.space) ship.shooting = false;
-
-    // UPDATE + DRAW sprites (iterate backwards to allow removal)
-    for (var i = Game.sprites.length - 1; i >= 0; i--) {
-      var s = Game.sprites[i];
-      // give each sprite the drawing context (already on prototype but keep safe)
-      s.context = ctx;
-      s.run(delta);
-      if (!s.visible) {
-        Game.sprites.splice(i, 1);
+  // COLLISION
+  bullets.forEach((b, bi) => {
+    asteroids.forEach((a, ai) => {
+      if (Math.hypot(b.x - a.x, b.y - a.y) < a.r) {
+        bullets.splice(bi, 1);
+        asteroids.splice(ai, 1);
+        score += 100;
+        spawnAsteroid();
       }
-    }
+    });
+  });
+}
 
-    // HUD / text (safe simple text)
-    Text.renderText("ASTEROIDS HTML5", 20, 10, 8);
-    Text.renderText("ARROWS = MOVE | SPACE = FIRE", 14, 10, 34);
+/* ================= DRAW ================= */
 
-    requestAnimationFrame(loop);
-  }
+function drawShip() {
+  ctx.save();
+  ctx.translate(ship.x, ship.y);
+  ctx.rotate(ship.rot);
+  ctx.beginPath();
+  ctx.moveTo(0, -12);
+  ctx.lineTo(8, 10);
+  ctx.lineTo(-8, 10);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.restore();
+}
 
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  drawShip();
+
+  // BULLETS
+  bullets.forEach(b => {
+    ctx.beginPath();
+    ctx.moveTo(b.x, b.y);
+    ctx.lineTo(b.x + b.vx * 0.02, b.y + b.vy * 0.02);
+    ctx.stroke();
+  });
+
+  // ASTEROIDS
+  asteroids.forEach(a => {
+    ctx.beginPath();
+    ctx.arc(a.x, a.y, a.r, 0, Math.PI * 2);
+    ctx.stroke();
+  });
+
+  // SCORE
+  ctx.font = "16px monospace";
+  ctx.fillText("SCORE: " + score, 10, 20);
+}
+
+/* ================= UTILS ================= */
+
+function wrap(o) {
+  if (o.x < 0) o.x += canvas.width;
+  if (o.x > canvas.width) o.x -= canvas.width;
+  if (o.y < 0) o.y += canvas.height;
+  if (o.y > canvas.height) o.y -= canvas.height;
+}
+
+/* ================= LOOP ================= */
+
+let last = performance.now();
+function loop(now) {
+  const delta = (now - last) / 1000;
+  last = now;
+  update(delta);
+  draw();
   requestAnimationFrame(loop);
-};
+}
+requestAnimationFrame(loop);
