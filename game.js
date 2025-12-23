@@ -1,8 +1,9 @@
 <script>
 /* =====================================
  ASTEROIDS HTML5 — ARCADE REMASTER
- Original concept: dmcinnes
- Remaster + Interface: Leonardo Dias Gomes
+ Original concept: Atari / dmcinnes
+ Remaster, Interface & Code:
+ Leonardo Dias Gomes
  YouTube: @BULOFK
 ===================================== */
 
@@ -10,34 +11,47 @@ const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 canvas.width = 800;
 canvas.height = 600;
-canvas.focus();
 
 /* ========= INPUT (SEM SCROLL) ========= */
 const KEY = {};
-addEventListener("keydown", e => {
-  if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].includes(e.code))
+window.addEventListener("keydown", e => {
+  if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space","KeyW"].includes(e.code))
     e.preventDefault();
   KEY[e.code] = true;
 });
-addEventListener("keyup", e => KEY[e.code] = false);
+window.addEventListener("keyup", e => KEY[e.code] = false);
 
-/* ========= GAME ========= */
+/* ========= AUDIO (VETORIAL) ========= */
+const AudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function beep(freq, time=0.05){
+  const o = AudioCtx.createOscillator();
+  const g = AudioCtx.createGain();
+  o.connect(g); g.connect(AudioCtx.destination);
+  o.type = "square";
+  o.frequency.value = freq;
+  g.gain.value = 0.05;
+  o.start();
+  o.stop(AudioCtx.currentTime + time);
+}
+
+/* ========= GAME STATE ========= */
 const Game = {
   state: "menu",
   score: 0,
   lives: 3,
   level: 1,
+  high: localStorage.getItem("asteroidsHS") || 0,
   asteroids: [],
   bullets: [],
   particles: [],
   ship: null,
-  showCredits: false
+  showCredits: false,
+  _started: false
 };
 
 /* ========= UTILS ========= */
 const rand = (a,b)=>Math.random()*(b-a)+a;
 const dist = (a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
-
 function wrap(o){
   if(o.x<0)o.x+=800;
   if(o.x>800)o.x-=800;
@@ -70,19 +84,32 @@ function Ship(){
   this.rot=0;
   this.vx=0; this.vy=0;
   this.inv=120;
+  this.cool=false;
+  this.warpCool=0;
 }
 Ship.prototype.update=function(){
   if(KEY.ArrowLeft) this.rot-=4;
   if(KEY.ArrowRight) this.rot+=4;
+
   if(KEY.ArrowUp){
     this.vx+=Math.sin(this.rot*Math.PI/180)*0.2;
     this.vy-=Math.cos(this.rot*Math.PI/180)*0.2;
   }
+
   if(KEY.Space && !this.cool){
     Game.bullets.push(new Bullet(this));
+    beep(800,0.04);
     this.cool=true;
   }
   if(!KEY.Space) this.cool=false;
+
+  if(KEY.KeyW && this.warpCool<=0){
+    this.x=rand(0,800);
+    this.y=rand(0,600);
+    this.warpCool=60;
+    beep(120,0.1);
+  }
+  if(this.warpCool>0) this.warpCool--;
 
   this.vx*=0.99; this.vy*=0.99;
   this.x+=this.vx; this.y+=this.vy;
@@ -132,9 +159,8 @@ function Asteroid(x,y,size,credit=false){
   this.vx=Math.cos(a)*rand(0.5,2);
   this.vy=Math.sin(a)*rand(0.5,2);
 
-  // Forma irregular
   this.shape=[];
-  for(let i=0;i<10;i++)
+  for(let i=0;i<12;i++)
     this.shape.push(rand(0.7,1.3));
 }
 Asteroid.prototype.update=function(){
@@ -161,11 +187,10 @@ Asteroid.prototype.draw=function(){
 function spawnAsteroids(){
   for(let i=0;i<3+Game.level;i++){
     let edge=Math.floor(rand(0,4));
-    let x=edge<2? (edge==0?0:800):rand(0,800);
-    let y=edge>=2?(edge==2?0:600):rand(0,600);
+    let x=edge<2?(edge===0?0:800):rand(0,800);
+    let y=edge>=2?(edge===2?0:600):rand(0,600);
     Game.asteroids.push(new Asteroid(x,y,3));
   }
-  // Asteroide azul (créditos)
   Game.asteroids.push(new Asteroid(50,50,2,true));
 }
 
@@ -180,6 +205,7 @@ function startGame(){
   Game.particles=[];
   Game.ship=new Ship();
   Game.showCredits=false;
+  Game._started=false;
   spawnAsteroids();
 }
 
@@ -187,14 +213,22 @@ function startGame(){
 function loop(){
   ctx.clearRect(0,0,800,600);
   ctx.strokeStyle="white";
+  ctx.fillStyle="white";
   ctx.font="16px monospace";
 
   if(Game.state==="menu"){
     ctx.textAlign="center";
+    ctx.font="28px monospace";
     ctx.fillText("ASTEROIDS",400,260);
+    ctx.font="16px monospace";
     ctx.fillText("PRESS SPACE TO START",400,300);
+    ctx.fillText("ARROWS MOVE | SPACE FIRE | W WARP",400,330);
     ctx.textAlign="left";
-    if(KEY.Space) startGame();
+
+    if(KEY.Space && !Game._started){
+      Game._started=true;
+      startGame();
+    }
   }
 
   if(Game.state==="play"){
@@ -212,6 +246,8 @@ function loop(){
         if(dist(a,b)<a.radius){
           Game.bullets.splice(bi,1);
           Game.asteroids.splice(ai,1);
+          beep(200,0.08);
+
           for(let i=0;i<20;i++)
             Game.particles.push(new Particle(a.x,a.y));
 
@@ -227,8 +263,15 @@ function loop(){
 
       if(dist(a,Game.ship)<a.radius && Game.ship.inv<=0){
         Game.lives--;
+        beep(80,0.2);
         Game.ship=new Ship();
-        if(Game.lives<=0) Game.state="menu";
+        if(Game.lives<=0){
+          if(Game.score>Game.high){
+            Game.high=Game.score;
+            localStorage.setItem("asteroidsHS",Game.high);
+          }
+          Game.state="menu";
+        }
       }
     });
 
@@ -238,13 +281,15 @@ function loop(){
     }
 
     ctx.fillText("SCORE: "+Game.score,20,20);
+    ctx.fillText("HI: "+Game.high,350,20);
     ctx.fillText("LIVES: "+Game.lives,700,20);
 
     if(Game.showCredits){
       ctx.textAlign="center";
+      ctx.font="12px monospace";
       ctx.fillText(
-        "Asteroids (HTML5) — dmcinnes | Remaster: Leonardo Dias Gomes | YT @BULOFK",
-        400,580
+        "Asteroids (HTML5) — Original: Atari / dmcinnes | Remaster: Leonardo Dias Gomes | YT @BULOFK",
+        400,585
       );
       ctx.textAlign="left";
     }
@@ -252,6 +297,14 @@ function loop(){
 
   requestAnimationFrame(loop);
 }
+
+/* ========= MOBILE SCALE ========= */
+function resize(){
+  const s=Math.min(innerWidth/800,innerHeight/600);
+  canvas.style.transform=`scale(${s})`;
+}
+window.addEventListener("resize",resize);
+resize();
 
 loop();
 </script>
