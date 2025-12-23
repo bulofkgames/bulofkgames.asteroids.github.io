@@ -10,10 +10,13 @@
 
 /* ================= CONSTANTS ================= */
 
-var MAX_SPEED = 80;
-var ROT_SPEED = 40;
-var ACCELERATION = 50;
-var FRICTION = 2.98;
+var MAX_SPEED = 220;
+var ROT_SPEED = 180;
+var ACCELERATION = 200;
+var FRICTION = 0.92;
+
+var BULLET_SPEED = 500;
+var BULLET_LIFE = 60;
 
 /* ================= INPUT ================= */
 
@@ -63,6 +66,7 @@ function Sprite() {
 
   this.run = function (delta) {
     if (!this.visible) return;
+
     this.move(delta);
 
     this.context.save();
@@ -86,9 +90,9 @@ function Sprite() {
     // speed limit
     var speed = Math.sqrt(this.vel.x * this.vel.x + this.vel.y * this.vel.y);
     if (speed > MAX_SPEED) {
-      var scale = MAX_SPEED / speed;
-      this.vel.x *= scale;
-      this.vel.y *= scale;
+      var s = MAX_SPEED / speed;
+      this.vel.x *= s;
+      this.vel.y *= s;
     }
 
     // movement
@@ -117,6 +121,36 @@ function Sprite() {
 
     this.context.closePath();
     this.context.stroke();
+  };
+}
+
+/* ================= BULLET ================= */
+
+function Bullet(x, y, rot) {
+  Sprite.call(this);
+
+  this.visible = true;
+  this.x = x;
+  this.y = y;
+  this.rot = rot;
+  this.life = BULLET_LIFE;
+
+  this.vel.x = Math.sin(rot * Math.PI / 180) * BULLET_SPEED;
+  this.vel.y = -Math.cos(rot * Math.PI / 180) * BULLET_SPEED;
+
+  this.init('bullet', [0, -2, 0, 2]);
+
+  this.move = function (delta) {
+    this.x += this.vel.x * delta;
+    this.y += this.vel.y * delta;
+
+    this.life--;
+    if (this.life <= 0) this.visible = false;
+
+    if (this.x < 0) this.x += Game.canvasWidth;
+    if (this.x > Game.canvasWidth) this.x -= Game.canvasWidth;
+    if (this.y < 0) this.y += Game.canvasHeight;
+    if (this.y > Game.canvasHeight) this.y -= Game.canvasHeight;
   };
 }
 
@@ -171,9 +205,6 @@ window.onload = function () {
   canvas.height = 600;
 
   var ctx = canvas.getContext('2d');
-
-  // IMPORTANT: remove visual artifacts
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.strokeStyle = "#ffffff";
   ctx.lineWidth = 2;
   ctx.lineJoin = "round";
@@ -192,6 +223,7 @@ window.onload = function () {
   ship.visible = true;
   ship.x = Game.canvasWidth / 2;
   ship.y = Game.canvasHeight / 2;
+  ship.shooting = false;
 
   Game.sprites.push(ship);
 
@@ -218,12 +250,22 @@ window.onload = function () {
       ship.acc.y = 0;
     }
 
-    for (var i = 0; i < Game.sprites.length; i++) {
-      Game.sprites[i].run(delta);
+    // SHOOT
+    if (KEY_STATUS.space && !ship.shooting) {
+      ship.shooting = true;
+      Game.sprites.push(new Bullet(ship.x, ship.y, ship.rot));
+    }
+    if (!KEY_STATUS.space) ship.shooting = false;
+
+    // UPDATE SPRITES
+    for (var i = Game.sprites.length - 1; i >= 0; i--) {
+      var s = Game.sprites[i];
+      s.run(delta);
+      if (!s.visible) Game.sprites.splice(i, 1);
     }
 
     Text.renderText("ASTEROIDS HTML5", 28, 180, 60);
-    Text.renderText("ARROWS TO MOVE", 18, 240, 100);
+    Text.renderText("ARROWS = MOVE | SPACE = FIRE", 16, 180, 100);
 
     requestAnimationFrame(loop);
   }
