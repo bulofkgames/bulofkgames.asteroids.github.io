@@ -20,6 +20,7 @@ const Game = {
   score: 0,
   lives: 3,
   level: 1,
+  high: Number(localStorage.getItem("asteroidsHS")) || 0,
   asteroids: [],
   bullets: [],
   ship: null,
@@ -46,9 +47,13 @@ function wrap(o){
 
 /* ========= SHIP ========= */
 function Ship(){
-  this.x=WIDTH/2; this.y=HEIGHT/2;
-  this.rot=0; this.vx=0; this.vy=0;
+  this.x=WIDTH/2;
+  this.y=HEIGHT/2;
+  this.rot=0;
+  this.vx=0;
+  this.vy=0;
   this.cool=false;
+  this.inv=120; // invencibilidade inicial
 }
 Ship.prototype.update=function(){
   if(KEY.ArrowLeft) this.rot-=4;
@@ -66,8 +71,11 @@ Ship.prototype.update=function(){
   this.vx*=0.99; this.vy*=0.99;
   this.x+=this.vx; this.y+=this.vy;
   wrap(this);
+
+  if(this.inv>0) this.inv--;
 };
 Ship.prototype.draw=function(){
+  if(this.inv>0 && this.inv%20<10) return;
   ctx.save();
   ctx.translate(this.x,this.y);
   ctx.rotate(this.rot*Math.PI/180);
@@ -100,7 +108,8 @@ Bullet.prototype.draw=function(){
 
 /* ========= ASTEROID ========= */
 function Asteroid(x,y,size,isCredit=false){
-  this.x=x; this.y=y; this.size=size;
+  this.x=x; this.y=y;
+  this.size=size;
   this.radius=size*18;
   this.isCredit=isCredit;
   const a=rand(0,Math.PI*2);
@@ -133,7 +142,7 @@ function FloatingText(text,x,y){
   this.x=x;
   this.y=y;
   this.alpha=1;
-  this.life=300; // ~5 seconds
+  this.life=300; // ~5s
 }
 FloatingText.prototype.update=function(){
   this.y-=0.3;
@@ -151,6 +160,8 @@ FloatingText.prototype.draw=function(){
 /* ========= GAME FLOW ========= */
 function startGame(){
   Game.state="play";
+  Game.score=0;
+  Game.lives=3;
   Game.ship=new Ship();
   Game.bullets=[];
   Game.asteroids=[];
@@ -169,6 +180,7 @@ function spawnAsteroids(n){
 
 /* ========= COLLISIONS ========= */
 function checkCollisions(){
+  // Bullet x Asteroid
   Game.bullets.forEach((b,bi)=>{
     Game.asteroids.forEach((a,ai)=>{
       if(Math.hypot(b.x-a.x,b.y-a.y)<a.radius){
@@ -189,6 +201,29 @@ function checkCollisions(){
       }
     });
   });
+
+  // Ship x Asteroid
+  Game.asteroids.forEach(a=>{
+    if(Game.ship.inv<=0 &&
+      Math.hypot(Game.ship.x-a.x,Game.ship.y-a.y)<a.radius){
+      Game.lives--;
+      Game.ship=new Ship();
+      if(Game.lives<=0){
+        Game.state="menu";
+        Game.high=Math.max(Game.high,Game.score);
+        localStorage.setItem("asteroidsHS",Game.high);
+      }
+    }
+  });
+}
+
+/* ========= HUD ========= */
+function drawHUD(){
+  ctx.font="16px monospace";
+  ctx.fillStyle="white";
+  ctx.fillText("SCORE: "+Game.score,20,30);
+  ctx.fillText("LIVES: "+Game.lives,20,50);
+  ctx.fillText("HIGH: "+Game.high,WIDTH-150,30);
 }
 
 /* ========= LOOP ========= */
@@ -216,6 +251,7 @@ function loop(){
     Game.asteroids.forEach(a=>{a.update();a.draw();});
 
     checkCollisions();
+    drawHUD();
 
     Game.floatingTexts.forEach((t,i)=>{
       t.update(); t.draw();
