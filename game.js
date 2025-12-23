@@ -2,7 +2,7 @@
  ASTEROIDS HTML5 — ARCADE REMASTER
  Original concept: Atari / dmcinnes
 
- Modifications, Fixes & Gameplay Expansion:
+ Remaster, Fixes & Gameplay Expansion:
  Leonardo Dias Gomes
  YouTube: @BULOFK
 ===================================== */
@@ -46,8 +46,8 @@ function wrap(o){
   if(o.y>HEIGHT) o.y-=HEIGHT;
 }
 
-/* ========= DIFFICULTY SYSTEM ========= */
-function getDifficulty() {
+/* ========= DIFFICULTY ========= */
+function getDifficulty(){
   return {
     level: Math.floor(Game.score / 200) + 1,
     speed: 1 + Math.floor(Game.score / 400) * 0.2,
@@ -66,7 +66,7 @@ function Ship(){
   this.cool = false;
   this.inv = 120;
 }
-Ship.prototype.update = function(){
+Ship.prototype.update=function(){
   if(KEY.ArrowLeft) this.rot -= 4;
   if(KEY.ArrowRight) this.rot += 4;
   if(KEY.ArrowUp){
@@ -85,10 +85,10 @@ Ship.prototype.update = function(){
   this.y += this.vy;
   wrap(this);
 
-  if(this.inv > 0) this.inv--;
+  if(this.inv>0) this.inv--;
 };
-Ship.prototype.draw = function(){
-  if(this.inv > 0 && this.inv % 20 < 10) return;
+Ship.prototype.draw=function(){
+  if(this.inv>0 && this.inv%20<10) return;
   ctx.save();
   ctx.translate(this.x,this.y);
   ctx.rotate(this.rot*Math.PI/180);
@@ -103,19 +103,19 @@ Ship.prototype.draw = function(){
 
 /* ========= BULLET ========= */
 function Bullet(s){
-  this.x = s.x;
-  this.y = s.y;
-  this.vx = Math.sin(s.rot*Math.PI/180)*7;
-  this.vy = -Math.cos(s.rot*Math.PI/180)*7;
-  this.life = 60;
+  this.x=s.x;
+  this.y=s.y;
+  this.vx=Math.sin(s.rot*Math.PI/180)*7;
+  this.vy=-Math.cos(s.rot*Math.PI/180)*7;
+  this.life=60;
 }
-Bullet.prototype.update = function(){
-  this.x += this.vx;
-  this.y += this.vy;
+Bullet.prototype.update=function(){
+  this.x+=this.vx;
+  this.y+=this.vy;
   this.life--;
   wrap(this);
 };
-Bullet.prototype.draw = function(){
+Bullet.prototype.draw=function(){
   ctx.beginPath();
   ctx.arc(this.x,this.y,2,0,Math.PI*2);
   ctx.stroke();
@@ -158,7 +158,7 @@ function FloatingText(text,x,y){
   this.x=x;
   this.y=y;
   this.alpha=1;
-  this.life=300; // ~5s
+  this.life=300;
 }
 FloatingText.prototype.update=function(){
   this.y-=0.3;
@@ -186,20 +186,19 @@ function startGame(){
 }
 
 function spawnAsteroids(n){
-  const diff = getDifficulty();
+  const diff=getDifficulty();
   for(let i=0;i<n;i++){
     const edge=Math.floor(Math.random()*4);
     let x,y;
-
     if(edge===0){ x=rand(0,WIDTH); y=-40; }
     else if(edge===1){ x=WIDTH+40; y=rand(0,HEIGHT); }
     else if(edge===2){ x=rand(0,WIDTH); y=HEIGHT+40; }
     else { x=-40; y=rand(0,HEIGHT); }
 
-    const credit = Math.random() < diff.creditChance;
-    const a = new Asteroid(x,y,3,credit);
-    a.vx *= diff.speed;
-    a.vy *= diff.speed;
+    const credit=Math.random()<diff.creditChance;
+    const a=new Asteroid(x,y,3,credit);
+    a.vx*=diff.speed;
+    a.vy*=diff.speed;
     Game.asteroids.push(a);
   }
 }
@@ -211,7 +210,6 @@ function checkCollisions(){
       if(Math.hypot(b.x-a.x,b.y-a.y)<a.radius){
         Game.bullets.splice(bi,1);
         Game.asteroids.splice(ai,1);
-
         if(a.isCredit){
           Game.score+=50;
           Game.floatingTexts.push(
@@ -220,17 +218,13 @@ function checkCollisions(){
               a.x,a.y
             )
           );
-        } else {
-          Game.score+=10;
-        }
+        } else Game.score+=10;
       }
     });
   });
 
-  const diff = getDifficulty();
-  if(Game.asteroids.length < diff.maxAsteroids){
-    spawnAsteroids(1);
-  }
+  const diff=getDifficulty();
+  if(Game.asteroids.length<diff.maxAsteroids) spawnAsteroids(1);
 
   Game.asteroids.forEach(a=>{
     if(Game.ship.inv<=0 &&
@@ -250,7 +244,6 @@ function checkCollisions(){
 function drawHUD(){
   const diff=getDifficulty();
   ctx.font="16px monospace";
-  ctx.fillStyle="white";
   ctx.fillText("SCORE: "+Game.score,20,30);
   ctx.fillText("LIVES: "+Game.lives,20,50);
   ctx.fillText("LEVEL: "+diff.level,20,70);
@@ -273,17 +266,12 @@ function loop(){
   }
 
   if(Game.state==="play"){
-    Game.ship.update();
-    Game.ship.draw();
-
+    Game.ship.update(); Game.ship.draw();
     Game.bullets=Game.bullets.filter(b=>b.life>0);
     Game.bullets.forEach(b=>{b.update();b.draw();});
-
     Game.asteroids.forEach(a=>{a.update();a.draw();});
-
     checkCollisions();
     drawHUD();
-
     Game.floatingTexts.forEach((t,i)=>{
       t.update(); t.draw();
       if(t.life<=0) Game.floatingTexts.splice(i,1);
