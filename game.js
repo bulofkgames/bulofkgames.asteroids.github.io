@@ -16,6 +16,18 @@ canvas.height = 600;
 const WIDTH = canvas.width;
 const HEIGHT = canvas.height;
 
+/* ========= SOUNDS ========= */
+const sounds = {
+  laser: new Audio("39459__THE_bizniss__laser.wav"),
+  explosion: new Audio("51467__smcameron__missile_explosion.wav")
+};
+
+function playSound(sound){
+  const s = sound.cloneNode();
+  s.volume = 0.5;
+  s.play();
+}
+
 /* ========= GAME STATE ========= */
 const Game = {
   state: "menu",
@@ -75,6 +87,7 @@ Ship.prototype.update=function(){
   }
   if(KEY.Space && !this.cool){
     Game.bullets.push(new Bullet(this));
+    playSound(sounds.laser);
     this.cool = true;
   }
   if(!KEY.Space) this.cool = false;
@@ -122,34 +135,51 @@ Bullet.prototype.draw=function(){
 };
 
 /* ========= ASTEROID ========= */
-function Asteroid(x,y,size,isCredit=false){
-  this.x=x; this.y=y;
-  this.size=size;
-  this.radius=size*18;
-  this.isCredit=isCredit;
-  const a=rand(0,Math.PI*2);
-  const s=rand(0.6,1.4);
-  this.vx=Math.cos(a)*s;
-  this.vy=Math.sin(a)*s;
-  this.shape=[];
-  for(let i=0;i<14;i++) this.shape.push(rand(0.7,1.3));
+function Asteroid(x, y, size, isCredit = false){
+  this.x = x;
+  this.y = y;
+  this.size = size;
+  this.radius = size * 18;
+  this.isCredit = isCredit;
+
+  const a = rand(0, Math.PI * 2);
+  const s = rand(0.8, 1.6);
+  this.vx = Math.cos(a) * s;
+  this.vy = Math.sin(a) * s;
+
+  this.shape = [];
+  const points = 10 + Math.floor(Math.random() * 6);
+  for (let i = 0; i < points; i++) {
+    this.shape.push(rand(0.6, 1.4));
+  }
+
+  this.rotation = rand(-0.02, 0.02);
+  this.angle = 0;
 }
 Asteroid.prototype.update=function(){
-  this.x+=this.vx;
-  this.y+=this.vy;
+  this.x += this.vx;
+  this.y += this.vy;
+  this.angle += this.rotation;
   wrap(this);
 };
 Asteroid.prototype.draw=function(){
+  ctx.save();
+  ctx.translate(this.x,this.y);
+  ctx.rotate(this.angle);
+
   ctx.beginPath();
   for(let i=0;i<this.shape.length;i++){
     const a=i/this.shape.length*Math.PI*2;
-    const px=this.x+Math.cos(a)*this.radius*this.shape[i];
-    const py=this.y+Math.sin(a)*this.radius*this.shape[i];
+    const r=this.radius*this.shape[i];
+    const px=Math.cos(a)*r;
+    const py=Math.sin(a)*r;
     i?ctx.lineTo(px,py):ctx.moveTo(px,py);
   }
   ctx.closePath();
   ctx.strokeStyle=this.isCredit?"yellow":"white";
+  ctx.lineWidth=this.size===3?2:1;
   ctx.stroke();
+  ctx.restore();
 };
 
 /* ========= FLOATING TEXT ========= */
@@ -210,11 +240,21 @@ function checkCollisions(){
       if(Math.hypot(b.x-a.x,b.y-a.y)<a.radius){
         Game.bullets.splice(bi,1);
         Game.asteroids.splice(ai,1);
+        playSound(sounds.explosion);
+
+        if(a.size>1){
+          for(let i=0;i<2;i++){
+            Game.asteroids.push(
+              new Asteroid(a.x,a.y,a.size-1,a.isCredit)
+            );
+          }
+        }
+
         if(a.isCredit){
           Game.score+=50;
           Game.floatingTexts.push(
             new FloatingText(
-              "CREDITS: Asteroids (HTML5) by dmcinnes | Remaster by Leonardo Dias Gomes (@BULOFK)",
+              "Asteroids HTML5 — dmcinnes | Remaster: BULOFK",
               a.x,a.y
             )
           );
